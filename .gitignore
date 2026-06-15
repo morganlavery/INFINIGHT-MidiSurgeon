@@ -1,0 +1,3 @@
+.venv/
+*.log
+midi-filter.pid

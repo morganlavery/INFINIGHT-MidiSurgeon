@@ -1,0 +1,6 @@
+# MIDI controls blocked by midifix.
+# Format: cc:<midi-channel>:<cc-number> or note:<midi-channel>:<note-number>
+# Example: cc:1:77
+
+cc:1:77
+cc:1:79

@@ -1,0 +1,45 @@
+{
+  "id": "novation-launch-control-xl-factory",
+  "name": "Novation Launch Control XL",
+  "vendor": "Novation",
+  "input_name": "Launch Control XL",
+  "output_name": "Launch Control XL Filtered",
+  "channel": 1,
+  "controls": [
+    { "id": "knob-a-1", "type": "knob", "row": "Knobs A", "label": "A1", "rule": "cc:1:13" },
+    { "id": "knob-a-2", "type": "knob", "row": "Knobs A", "label": "A2", "rule": "cc:1:14" },
+    { "id": "knob-a-3", "type": "knob", "row": "Knobs A", "label": "A3", "rule": "cc:1:15" },
+    { "id": "knob-a-4", "type": "knob", "row": "Knobs A", "label": "A4", "rule": "cc:1:16" },
+    { "id": "knob-a-5", "type": "knob", "row": "Knobs A", "label": "A5", "rule": "cc:1:17" },
+    { "id": "knob-a-6", "type": "knob", "row": "Knobs A", "label": "A6", "rule": "cc:1:18" },
+    { "id": "knob-a-7", "type": "knob", "row": "Knobs A", "label": "A7", "rule": "cc:1:19" },
+    { "id": "knob-a-8", "type": "knob", "row": "Knobs A", "label": "A8", "rule": "cc:1:20" },
+
+    { "id": "knob-b-1", "type": "knob", "row": "Knobs B", "label": "B1", "rule": "cc:1:29" },
+    { "id": "knob-b-2", "type": "knob", "row": "Knobs B", "label": "B2", "rule": "cc:1:30" },
+    { "id": "knob-b-3", "type": "knob", "row": "Knobs B", "label": "B3", "rule": "cc:1:31" },
+    { "id": "knob-b-4", "type": "knob", "row": "Knobs B", "label": "B4", "rule": "cc:1:32" },
+    { "id": "knob-b-5", "type": "knob", "row": "Knobs B", "label": "B5", "rule": "cc:1:33" },
+    { "id": "knob-b-6", "type": "knob", "row": "Knobs B", "label": "B6", "rule": "cc:1:34" },
+    { "id": "knob-b-7", "type": "knob", "row": "Knobs B", "label": "B7", "rule": "cc:1:35" },
+    { "id": "knob-b-8", "type": "knob", "row": "Knobs B", "label": "B8", "rule": "cc:1:36" },
+
+    { "id": "knob-c-1", "type": "knob", "row": "Knobs C", "label": "C1", "rule": "cc:1:49" },
+    { "id": "knob-c-2", "type": "knob", "row": "Knobs C", "label": "C2", "rule": "cc:1:50" },
+    { "id": "knob-c-3", "type": "knob", "row": "Knobs C", "label": "C3", "rule": "cc:1:51" },
+    { "id": "knob-c-4", "type": "knob", "row": "Knobs C", "label": "C4", "rule": "cc:1:52" },
+    { "id": "knob-c-5", "type": "knob", "row": "Knobs C", "label": "C5", "rule": "cc:1:53" },
+    { "id": "knob-c-6", "type": "knob", "row": "Knobs C", "label": "C6", "rule": "cc:1:54" },
+    { "id": "knob-c-7", "type": "knob", "row": "Knobs C", "label": "C7", "rule": "cc:1:55" },
+    { "id": "knob-c-8", "type": "knob", "row": "Knobs C", "label": "C8", "rule": "cc:1:56" },
+
+    { "id": "fader-1", "type": "fader", "row": "Faders", "label": "F1", "rule": "cc:1:77" },
+    { "id": "fader-2", "type": "fader", "row": "Faders", "label": "F2", "rule": "cc:1:78" },
+    { "id": "fader-3", "type": "fader", "row": "Faders", "label": "F3", "rule": "cc:1:79" },
+    { "id": "fader-4", "type": "fader", "row": "Faders", "label": "F4", "rule": "cc:1:80" },
+    { "id": "fader-5", "type": "fader", "row": "Faders", "label": "F5", "rule": "cc:1:81" },
+    { "id": "fader-6", "type": "fader", "row": "Faders", "label": "F6", "rule": "cc:1:82" },
+    { "id": "fader-7", "type": "fader", "row": "Faders", "label": "F7", "rule": "cc:1:83" },
+    { "id": "fader-8", "type": "fader", "row": "Faders", "label": "F8", "rule": "cc:1:84" }
+  ]
+}
