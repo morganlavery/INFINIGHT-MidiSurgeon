@@ -3,11 +3,28 @@
 
 import argparse
 from pathlib import Path
+import sys
 import threading
 
-import webview
-
 import midifix
+
+
+APP_NAME = "INFINIGHT MidiSurgeon"
+
+
+def configure_macos_app_name():
+    if sys.platform != "darwin":
+        return
+
+    try:
+        import Foundation
+    except ImportError:
+        return
+
+    bundle = Foundation.NSBundle.mainBundle()
+    info = bundle.localizedInfoDictionary() or bundle.infoDictionary()
+    info["CFBundleName"] = APP_NAME
+    info["CFBundleDisplayName"] = APP_NAME
 
 
 def start_server(host, port, block_file, preset_dir):
@@ -43,7 +60,10 @@ def main(argv=None):
 
     server, url = start_server(args.host, args.port, args.block_file, args.preset_dir)
     try:
-        webview.create_window("INFINIGHT MidiSurgeon", url, width=1280, height=900, min_size=(720, 620))
+        configure_macos_app_name()
+        import webview
+
+        webview.create_window(APP_NAME, url, width=1280, height=900, min_size=(720, 620))
         webview.start(gui="cocoa")
     finally:
         server.shutdown()
