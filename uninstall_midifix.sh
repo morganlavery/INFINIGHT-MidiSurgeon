@@ -11,4 +11,4 @@ launchctl bootout "$GUI_DOMAIN" "$PLIST" 2>/dev/null || true
 launchctl bootout "$GUI_DOMAIN" "$OLD_PLIST" 2>/dev/null || true
 rm -f "$PLIST" "$OLD_PLIST"
 
-echo "Uninstalled midifix launch agent."
+echo "Uninstalled INFINIGHT MidiSurgeon launch agent."

@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <title>INFINIGHT logo icon</title>
+  <defs>
+    <linearGradient id="mark" x1="180" y1="382" x2="844" y2="642" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#19f4ff"/>
+      <stop offset=".42" stop-color="#12b5ff"/>
+      <stop offset="1" stop-color="#1e4fff"/>
+    </linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="18" result="blur"/>
+      <feFlood flood-color="#00eaff" flood-opacity=".72"/>
+      <feComposite in2="blur" operator="in"/>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <rect width="1024" height="1024" rx="210" fill="#07090d"/>
+  <rect x="72" y="72" width="880" height="880" rx="178" fill="#14171d" stroke="#2b3038" stroke-width="8"/>
+  <path
+    d="M205 512c52-111 129-167 231-167 70 0 125 31 178 84l82 82c37 37 70 58 110 58 45 0 80-25 105-74 14-27 46-38 73-24 27 14 38 47 24 74-46 89-115 134-204 134-72 0-128-31-184-88l-82-82c-35-35-65-55-104-55-53 0-95 36-131 113-13 28-45 40-73 28-28-13-40-45-25-83Z"
+    fill="url(#mark)"
+    filter="url(#glow)"/>
+  <path
+    d="M819 512c-52-111-129-167-231-167-70 0-125 31-178 84l-82 82c-37 37-70 58-110 58-45 0-80-25-105-74-14-27-46-38-73-24-27 14-38 47-24 74 46 89 115 134 204 134 72 0 128-31 184-88l82-82c35-35 65-55 104-55 53 0 95 36 131 113 13 28 45 40 73 28 28-13 40-45 25-83Z"
+    fill="url(#mark)"
+    opacity=".96"
+    filter="url(#glow)"/>
+</svg>

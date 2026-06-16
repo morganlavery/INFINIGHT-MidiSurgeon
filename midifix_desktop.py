@@ -1,0 +1,74 @@
+#!/usr/bin/env python3
+"""Run INFINIGHT MidiSurgeon as a native desktop window."""
+
+import argparse
+from pathlib import Path
+import sys
+import threading
+
+import midifix
+
+
+APP_NAME = "INFINIGHT MidiSurgeon"
+
+
+def configure_macos_app_name():
+    if sys.platform != "darwin":
+        return
+
+    try:
+        import Foundation
+    except ImportError:
+        return
+
+    bundle = Foundation.NSBundle.mainBundle()
+    info = bundle.localizedInfoDictionary() or bundle.infoDictionary()
+    info["CFBundleName"] = APP_NAME
+    info["CFBundleDisplayName"] = APP_NAME
+
+
+def start_server(host, port, block_file, preset_dir):
+    port = midifix.find_available_port(port)
+    midifix.ACTIVITY_MONITOR.ensure_started()
+    state = midifix.MidiFixState(block_file, preset_dir)
+    handler = type(
+        "DesktopMidiFixHandler",
+        (midifix.MidiFixHandler,),
+        {"state": state},
+    )
+    server = midifix.MidiFixServer((host, port), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    return server, f"http://{host}:{port}"
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--host", default=midifix.DEFAULT_HOST)
+    parser.add_argument("--port", type=int, default=midifix.DEFAULT_PORT)
+    parser.add_argument(
+        "--block-file",
+        default=midifix.DEFAULT_BLOCK_FILE,
+        help="path to the blocklist controlled by the app",
+    )
+    parser.add_argument(
+        "--preset-dir",
+        default=midifix.DEFAULT_PRESET_DIR,
+        help="directory for saved presets",
+    )
+    args = parser.parse_args(argv)
+
+    server, url = start_server(args.host, args.port, args.block_file, args.preset_dir)
+    try:
+        configure_macos_app_name()
+        import webview
+
+        webview.create_window(APP_NAME, url, width=1280, height=900, min_size=(720, 620))
+        webview.start(gui="cocoa")
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+if __name__ == "__main__":
+    main()

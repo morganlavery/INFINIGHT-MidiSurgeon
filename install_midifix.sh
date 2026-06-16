@@ -71,7 +71,7 @@ launchctl bootstrap "$GUI_DOMAIN" "$PLIST"
 launchctl enable "$GUI_DOMAIN/$LABEL"
 launchctl kickstart -k "$GUI_DOMAIN/$LABEL"
 
-echo "Installed midifix launch agent."
+echo "Installed INFINIGHT MidiSurgeon launch agent."
 echo "Virtual port: Launch Control XL Filtered"
 echo "Blocklist: $APP_DIR/blocked_controls.txt"
 echo "Logs: $LOG_DIR"

@@ -1,3 +1,5 @@
 .venv/
 *.log
 midi-filter.pid
+build/
+dist/

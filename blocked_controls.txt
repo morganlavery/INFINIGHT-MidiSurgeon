@@ -1,4 +1,4 @@
-# MIDI controls blocked by midifix.
+# MIDI controls blocked by INFINIGHT MidiSurgeon.
 # Format: cc:<midi-channel>:<cc-number> or note:<midi-channel>:<note-number>
 # Example: cc:1:77
 
