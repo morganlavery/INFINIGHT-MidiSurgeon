@@ -3,7 +3,8 @@
 `midifix` is a local MIDI repair app for noisy controllers. It filters broken
 faders and knobs from a hardware input, forwards everything else to a clean
 virtual MIDI port, and gives you a browser UI for turning individual controls on
-or off.
+or off. The interface uses a retro skill-game board style with red fault
+lights for blocked or noisy controls.
 
 The stuck message detected from the Launch Control XL was:
 
@@ -16,14 +17,49 @@ Launch Control XL template maps that to **Fader 1**.
 
 ## Start The App
 
+Open the standalone macOS app:
+
+```sh
+open /Applications/midifix.app
+```
+
+Or start the same desktop app from Terminal:
+
+```sh
+./midifix_app.sh
+```
+
+For browser-based development, you can still run:
+
 ```sh
 ./midifix.sh
 ```
 
-Open the printed local URL, usually:
+and open the printed local URL, usually:
 
 ```text
 http://127.0.0.1:8765
+```
+
+## Build Installer DMG
+
+Create a distributable DMG:
+
+```sh
+./build_dmg.sh
+```
+
+The output is:
+
+```text
+dist/midifix.dmg
+```
+
+Install the app by dragging `midifix.app` to Applications from the DMG, or copy
+the built app directly:
+
+```sh
+ditto build/dmg/midifix.app /Applications/midifix.app
 ```
 
 Click a fader or knob to block it. Click it again to let it pass. The running
@@ -32,6 +68,8 @@ without restarting the MIDI filter.
 
 Move a fader or knob and its tile lights up briefly. If a control is stuck and
 keeps sending MIDI, that tile will keep pulsing so you can spot it quickly.
+Once you block that control, midifix ignores it in the activity monitor and in
+learn mode, so another bad control can be detected next.
 
 The connected MIDI area shows ports detected on the system. Known controllers
 are matched to templates automatically, while unknown or virtual ports are still
@@ -57,6 +95,16 @@ controller and lists controls with block rules:
   ]
 }
 ```
+
+Included profiles currently cover:
+
+- Akai APC40 mkII
+- Akai MPK Mini IV
+- Arturia KeyLab Essential mk3 49
+- Arturia MiniLab 3
+- Novation Launch Control XL
+- Novation Launchkey Mini 25 MK4
+- Novation Launchpad X
 
 Block rules use this format:
 
