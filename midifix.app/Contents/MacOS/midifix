@@ -13,6 +13,7 @@ fi
 
 SUPPORT_DIR="$HOME/Library/Application Support/midifix"
 BLOCK_FILE="$SUPPORT_DIR/blocked_controls.txt"
+PRESET_DIR="$SUPPORT_DIR/presets"
 mkdir -p "$SUPPORT_DIR"
 
 if [[ ! -f "$BLOCK_FILE" && -f "$APP_CODE_DIR/blocked_controls.txt" ]]; then
@@ -20,4 +21,4 @@ if [[ ! -f "$BLOCK_FILE" && -f "$APP_CODE_DIR/blocked_controls.txt" ]]; then
 fi
 
 cd "$APP_CODE_DIR"
-exec /usr/bin/arch -arm64 "$PYTHON" "$APP_CODE_DIR/midifix_desktop.py" --block-file "$BLOCK_FILE"
+exec /usr/bin/arch -arm64 "$PYTHON" "$APP_CODE_DIR/midifix_desktop.py" --block-file "$BLOCK_FILE" --preset-dir "$PRESET_DIR"

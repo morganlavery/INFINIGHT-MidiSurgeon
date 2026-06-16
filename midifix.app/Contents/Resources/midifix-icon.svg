@@ -1,10 +1,30 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
-  <title>midifix icon</title>
-  <g transform="translate(0 36)">
-    <ellipse cx="512" cy="820" rx="340" ry="54" fill="#31100f" opacity=".22"/>
-    <path d="M192 552c0-70 57-127 127-127h386c70 0 127 57 127 127v108c0 86-70 156-156 156H348c-86 0-156-70-156-156Z" fill="#6b351d" stroke="#31100f" stroke-width="48" stroke-linejoin="round"/>
-    <path d="M300 340c0-70 57-127 127-127h226c70 0 127 57 127 127v71c0 70-57 127-127 127H427c-70 0-127-57-127-127Z" fill="#6b351d" stroke="#31100f" stroke-width="48" stroke-linejoin="round"/>
-    <path d="M488 136c15-77 90-127 167-112 77 15 127 90 112 167l-20 99c-15 77-90 127-167 112-77-15-127-90-112-167Z" fill="#6b351d" stroke="#31100f" stroke-width="48" stroke-linejoin="round"/>
-    <ellipse cx="360" cy="640" rx="57" ry="38" fill="#fff6b7" opacity=".62" transform="rotate(-18 360 640)"/>
-  </g>
+  <title>INFINIGHT logo icon</title>
+  <defs>
+    <linearGradient id="mark" x1="180" y1="382" x2="844" y2="642" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#19f4ff"/>
+      <stop offset=".42" stop-color="#12b5ff"/>
+      <stop offset="1" stop-color="#1e4fff"/>
+    </linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="18" result="blur"/>
+      <feFlood flood-color="#00eaff" flood-opacity=".72"/>
+      <feComposite in2="blur" operator="in"/>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <rect width="1024" height="1024" rx="210" fill="#07090d"/>
+  <rect x="72" y="72" width="880" height="880" rx="178" fill="#14171d" stroke="#2b3038" stroke-width="8"/>
+  <path
+    d="M205 512c52-111 129-167 231-167 70 0 125 31 178 84l82 82c37 37 70 58 110 58 45 0 80-25 105-74 14-27 46-38 73-24 27 14 38 47 24 74-46 89-115 134-204 134-72 0-128-31-184-88l-82-82c-35-35-65-55-104-55-53 0-95 36-131 113-13 28-45 40-73 28-28-13-40-45-25-83Z"
+    fill="url(#mark)"
+    filter="url(#glow)"/>
+  <path
+    d="M819 512c-52-111-129-167-231-167-70 0-125 31-178 84l-82 82c-37 37-70 58-110 58-45 0-80-25-105-74-14-27-46-38-73-24-27 14-38 47-24 74 46 89 115 134 204 134 72 0 128-31 184-88l82-82c35-35 65-55 104-55 53 0 95 36 131 113 13 28 45 40 73 28 28-13 40-45 25-83Z"
+    fill="url(#mark)"
+    opacity=".96"
+    filter="url(#glow)"/>
 </svg>

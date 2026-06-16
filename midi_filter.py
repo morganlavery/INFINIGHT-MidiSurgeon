@@ -69,7 +69,7 @@ def write_block_file(path, rules):
     path = Path(path).expanduser()
     path.parent.mkdir(parents=True, exist_ok=True)
     lines = [
-        "# MIDI controls blocked by midifix.",
+        "# MIDI controls blocked by INFINIGHT MidiSurgeon.",
         "# Format: cc:<midi-channel>:<cc-number> or note:<midi-channel>:<note-number>",
         "# Example: cc:1:77",
         "",

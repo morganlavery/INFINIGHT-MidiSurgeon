@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run midifix as a native desktop window."""
+"""Run INFINIGHT MidiSurgeon as a native desktop window."""
 
 import argparse
 from pathlib import Path
@@ -10,10 +10,10 @@ import webview
 import midifix
 
 
-def start_server(host, port, block_file):
+def start_server(host, port, block_file, preset_dir):
     port = midifix.find_available_port(port)
     midifix.ACTIVITY_MONITOR.ensure_started()
-    state = midifix.MidiFixState(block_file)
+    state = midifix.MidiFixState(block_file, preset_dir)
     handler = type(
         "DesktopMidiFixHandler",
         (midifix.MidiFixHandler,),
@@ -34,11 +34,16 @@ def main(argv=None):
         default=midifix.DEFAULT_BLOCK_FILE,
         help="path to the blocklist controlled by the app",
     )
+    parser.add_argument(
+        "--preset-dir",
+        default=midifix.DEFAULT_PRESET_DIR,
+        help="directory for saved presets",
+    )
     args = parser.parse_args(argv)
 
-    server, url = start_server(args.host, args.port, args.block_file)
+    server, url = start_server(args.host, args.port, args.block_file, args.preset_dir)
     try:
-        webview.create_window("midifix", url, width=1280, height=900, min_size=(720, 620))
+        webview.create_window("INFINIGHT MidiSurgeon", url, width=1280, height=900, min_size=(720, 620))
         webview.start(gui="cocoa")
     finally:
         server.shutdown()

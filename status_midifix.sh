@@ -12,7 +12,7 @@ LABEL="com.local.midifix"
 GUI_DOMAIN="gui/$(id -u)"
 
 launchctl print "$GUI_DOMAIN/$LABEL" 2>/dev/null | sed -n '1,40p' || {
-  echo "midifix launch agent is not loaded."
+  echo "INFINIGHT MidiSurgeon launch agent is not loaded."
 }
 
 echo

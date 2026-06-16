@@ -6,6 +6,7 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 from pathlib import Path
+import re
 import socket
 import sys
 import threading
@@ -20,6 +21,7 @@ import midi_filter
 ROOT_DIR = Path(__file__).resolve().parent
 TEMPLATE_DIR = ROOT_DIR / "controller_templates"
 DEFAULT_BLOCK_FILE = ROOT_DIR / "blocked_controls.txt"
+DEFAULT_PRESET_DIR = ROOT_DIR / "presets"
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
 
@@ -55,6 +57,15 @@ def read_json(request):
     if length == 0:
         return {}
     return json.loads(request.rfile.read(length).decode("utf-8"))
+
+
+def timestamp():
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+
+def slugify(text):
+    slug = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
+    return slug or "preset"
 
 
 def rule_text_to_tuple(rule_text):
@@ -178,8 +189,9 @@ def discover_controllers(templates, inputs, outputs):
 
 
 class MidiFixState:
-    def __init__(self, block_file):
+    def __init__(self, block_file, preset_dir=None):
         self.block_file = Path(block_file).expanduser()
+        self.preset_dir = Path(preset_dir).expanduser() if preset_dir else self.block_file.parent / "presets"
 
     def load_rules(self):
         return midi_filter.load_block_file(self.block_file)
@@ -201,6 +213,109 @@ class MidiFixState:
         rules = {rule_text_to_tuple(rule_text) for rule_text in rule_texts}
         self.save_rules(rules)
         return rules
+
+    def list_presets(self):
+        if not self.preset_dir.exists():
+            return []
+
+        presets = []
+        for path in sorted(self.preset_dir.glob("*.json")):
+            try:
+                presets.append(self.load_preset(path.stem))
+            except (OSError, ValueError, json.JSONDecodeError):
+                continue
+        return sorted(
+            presets,
+            key=lambda item: (item.get("updated_at") or "", item.get("name") or ""),
+            reverse=True,
+        )
+
+    def preset_path(self, preset_id):
+        if not preset_id:
+            raise ValueError("preset id is required")
+        if preset_id != slugify(preset_id):
+            raise ValueError("invalid preset id")
+        return self.preset_dir / f"{preset_id}.json"
+
+    def load_preset(self, preset_id):
+        path = self.preset_path(preset_id)
+        if not path.exists():
+            raise ValueError("preset not found")
+        with path.open() as preset_file:
+            data = json.load(preset_file)
+
+        name = str(data.get("name") or path.stem).strip() or path.stem
+        rules = sorted(
+            tuple_to_rule_text(rule_text_to_tuple(rule_text))
+            for rule_text in data.get("blocked_rules", [])
+        )
+        return {
+            "id": path.stem,
+            "name": name,
+            "template_id": data.get("template_id"),
+            "template_name": data.get("template_name"),
+            "input_name": data.get("input_name"),
+            "blocked_rules": rules,
+            "created_at": data.get("created_at"),
+            "updated_at": data.get("updated_at"),
+        }
+
+    def unique_preset_id(self, name, current_id=None):
+        base = slugify(name)
+        if current_id:
+            return current_id
+        candidate = base
+        index = 2
+        while self.preset_path(candidate).exists():
+            candidate = f"{base}-{index}"
+            index += 1
+        return candidate
+
+    def save_preset(self, payload):
+        current_id = payload.get("id") or None
+        existing = None
+        if current_id:
+            existing = self.load_preset(current_id)
+
+        name = str(payload.get("name") or existing.get("name") if existing else payload.get("name") or "").strip()
+        if not name:
+            raise ValueError("preset name is required")
+
+        preset_id = self.unique_preset_id(name, current_id)
+        rule_texts = payload.get("blocked_rules", [])
+        if not isinstance(rule_texts, list):
+            raise ValueError("blocked_rules must be a list")
+
+        rules = sorted(
+            tuple_to_rule_text(rule_text_to_tuple(rule_text))
+            for rule_text in rule_texts
+        )
+        now = timestamp()
+        preset = {
+            "id": preset_id,
+            "name": name,
+            "template_id": payload.get("template_id"),
+            "template_name": payload.get("template_name"),
+            "input_name": payload.get("input_name"),
+            "blocked_rules": rules,
+            "created_at": existing.get("created_at") if existing else now,
+            "updated_at": now,
+        }
+
+        self.preset_dir.mkdir(parents=True, exist_ok=True)
+        path = self.preset_path(preset_id)
+        temp_path = path.with_suffix(".tmp")
+        with temp_path.open("w") as preset_file:
+            json.dump(preset, preset_file, indent=2)
+            preset_file.write("\n")
+        temp_path.replace(path)
+        return preset
+
+    def delete_preset(self, preset_id):
+        path = self.preset_path(preset_id)
+        if not path.exists():
+            raise ValueError("preset not found")
+        path.unlink()
 
 
 class ActivityMonitor:
@@ -322,7 +437,7 @@ def build_app_html():
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>midi-FIX</title>
+  <title>INFINIGHT MidiSurgeon</title>
   <style>
     :root {
       color-scheme: light;
@@ -379,17 +494,173 @@ def build_app_html():
 
     h1 {
       margin: 0;
-      font-size: 28px;
+      max-width: 560px;
+      font-size: 26px;
       line-height: 1;
       font-weight: 760;
+      overflow-wrap: anywhere;
+    }
+
+    .status-panel {
+      position: relative;
+      display: grid;
+      justify-items: end;
+      gap: 4px;
+      min-width: min(420px, 52vw);
+    }
+
+    .midi-status-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      max-width: 100%;
+      min-height: 30px;
+      border: 2px solid rgba(255, 246, 183, 0.74);
+      border-radius: 7px;
+      background: rgba(143, 11, 21, 0.34);
+      color: #fff3a6;
+      padding: 4px 9px 5px 11px;
+      font: inherit;
+      font-size: 14px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .midi-status-button:focus-visible {
+      outline: 3px solid #fff6b7;
+      outline-offset: 2px;
+    }
+
+    .midi-status-label {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .midi-status-chevron {
+      width: 0;
+      height: 0;
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+      border-top: 6px solid currentColor;
+      flex: 0 0 auto;
+    }
+
+    .midi-popover {
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      z-index: 20;
+      width: min(360px, calc(100vw - 28px));
+      border: 3px solid #31100f;
+      border-radius: 8px;
+      background: #fff6b7;
+      color: var(--ink);
+      box-shadow: 6px 6px 0 #8f0b15, 0 14px 30px rgba(56, 26, 16, 0.28);
+      text-align: left;
+      overflow: hidden;
+    }
+
+    .midi-popover[hidden] {
+      display: none;
+    }
+
+    .midi-popover-title {
+      padding: 10px 12px 8px;
+      border-bottom: 2px solid rgba(49, 16, 15, 0.18);
+      font-size: 12px;
+      font-weight: 900;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .midi-device-list {
+      display: grid;
+      max-height: 280px;
+      overflow: auto;
+    }
+
+    .midi-device {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 12px minmax(0, 1fr);
+      gap: 9px;
+      align-items: center;
+      border: 0;
+      border-bottom: 1px solid rgba(49, 16, 15, 0.14);
+      background: transparent;
+      color: var(--ink);
+      padding: 10px 12px;
+      text-align: left;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    .midi-device:last-child {
+      border-bottom: 0;
+    }
+
+    .midi-device:hover,
+    .midi-device:focus-visible {
+      background: #ffef83;
+      outline: none;
+    }
+
+    .midi-device.selected {
+      background: #dff4c7;
+    }
+
+    .midi-device-dot {
+      width: 10px;
+      height: 10px;
+      border: 2px solid #31100f;
+      border-radius: 50%;
+      background: var(--passing);
+      box-shadow: 0 0 0 2px rgba(24, 169, 87, 0.2);
+    }
+
+    .midi-device.receiving .midi-device-dot {
+      background: var(--warning);
+      box-shadow: 0 0 0 3px rgba(255, 216, 79, 0.5), 0 0 16px rgba(215, 154, 0, 0.62);
+    }
+
+    .midi-device-name,
+    .midi-device-meta {
+      display: block;
+      overflow-wrap: anywhere;
+    }
+
+    .midi-device-name {
+      font-size: 14px;
+      line-height: 1.15;
+      font-weight: 800;
+    }
+
+    .midi-device-meta {
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.2;
+      font-weight: 650;
+    }
+
+    .midi-popover-empty {
+      padding: 13px 12px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
     }
 
     .status {
       min-height: 24px;
+      max-width: 100%;
       color: #fff3a6;
       font-size: 14px;
       text-align: right;
       font-weight: 700;
+      overflow-wrap: anywhere;
     }
 
     main {
@@ -533,19 +804,32 @@ def build_app_html():
       text-align: center;
       transform: rotate(-90deg);
       transform-origin: center;
-      letter-spacing: 1px;
+      letter-spacing: 0;
     }
 
     .vertical-logo {
+      display: grid;
+      justify-items: center;
+      gap: 8px;
       color: #c91822;
       font-family: Georgia, "Times New Roman", serif;
-      font-size: clamp(56px, 7vw, 88px);
+      text-align: center;
+      text-shadow: 2px 2px 0 #ffed70;
+    }
+
+    .brand-mark {
+      color: #67291d;
+      font: 900 16px ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 0;
+    }
+
+    .product-mark {
+      font-size: 64px;
       line-height: 0.82;
       font-weight: 900;
-      letter-spacing: -2px;
+      letter-spacing: 0;
       writing-mode: vertical-rl;
       transform: rotate(180deg);
-      text-shadow: 2px 2px 0 #ffed70;
     }
 
     .playfield {
@@ -575,7 +859,7 @@ def build_app_html():
     }
 
     .break-copy {
-      font-size: clamp(14px, 1.8vw, 19px);
+      font-size: 17px;
       line-height: 0.95;
       font-weight: 900;
       text-transform: uppercase;
@@ -638,6 +922,14 @@ def build_app_html():
       grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr) auto auto auto;
       gap: 10px;
       align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .preset-bar {
+      display: grid;
+      grid-template-columns: minmax(220px, 1fr) auto auto auto auto;
+      gap: 10px;
+      align-items: center;
       margin-bottom: 18px;
     }
 
@@ -670,6 +962,12 @@ def build_app_html():
       background: var(--passing);
       border-color: #0f7d3d;
       color: #f7fff4;
+    }
+
+    .button.danger {
+      background: var(--danger);
+      border-color: #8f0b15;
+      color: #fff7bf;
     }
 
     .button:disabled {
@@ -1984,7 +2282,23 @@ def build_app_html():
         text-align: left;
       }
 
+      .status-panel {
+        width: 100%;
+        min-width: 0;
+        justify-items: start;
+      }
+
+      .midi-popover {
+        left: 0;
+        right: auto;
+        width: min(360px, calc(100vw - 52px));
+      }
+
       .toolbar {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .preset-bar {
         grid-template-columns: 1fr 1fr;
       }
 
@@ -2018,15 +2332,29 @@ def build_app_html():
       }
 
       .vertical-logo {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+        text-align: left;
+      }
+
+      .brand-mark {
+        font-size: 12px;
+      }
+
+      .product-mark {
         writing-mode: horizontal-tb;
         transform: none;
-        font-size: 54px;
+        font-size: 42px;
         line-height: 1;
-        letter-spacing: -1px;
       }
 
       .playfield {
         padding-top: 78px;
+      }
+
+      .break-copy {
+        font-size: 15px;
       }
 
       .break-sticker {
@@ -2063,10 +2391,26 @@ def build_app_html():
       }
 
       .vertical-logo {
-        font-size: 42px;
+        gap: 6px;
+      }
+
+      .brand-mark {
+        font-size: 10px;
+      }
+
+      .product-mark {
+        font-size: 32px;
+      }
+
+      .break-copy {
+        font-size: 14px;
       }
 
       .toolbar {
+        grid-template-columns: 1fr;
+      }
+
+      .preset-bar {
         grid-template-columns: 1fr;
       }
 
@@ -2096,8 +2440,15 @@ def build_app_html():
 <body>
   <div class="shell">
     <header>
-      <h1>midi-FIX</h1>
-      <div class="status" id="status"></div>
+      <h1>INFINIGHT MidiSurgeon</h1>
+      <div class="status-panel" id="statusPanel">
+        <button class="midi-status-button" id="midiStatusButton" type="button" aria-haspopup="listbox" aria-expanded="false" aria-controls="midiStatusPopover">
+          <span class="midi-status-label" id="midiStatusLabel">Listening for MIDI</span>
+          <span class="midi-status-chevron" aria-hidden="true"></span>
+        </button>
+        <div class="status" id="status"></div>
+        <div class="midi-popover" id="midiStatusPopover" role="listbox" aria-label="Connected MIDI devices" hidden></div>
+      </div>
     </header>
     <main>
       <section class="operation-board">
@@ -2136,7 +2487,10 @@ def build_app_html():
             <text class="patient-label" x="735" y="105" transform="rotate(13 735 105)">WOBBLY CC</text>
             <text class="patient-label" x="721" y="641" transform="rotate(-10 721 641)">BAD FADER</text>
           </svg>
-          <div class="vertical-logo">midi-FIX</div>
+          <div class="vertical-logo">
+            <span class="brand-mark">INFINIGHT</span>
+            <span class="product-mark">MidiSurgeon</span>
+          </div>
         </aside>
         <section class="playfield">
           <div class="toolbar">
@@ -2145,6 +2499,13 @@ def build_app_html():
             <button class="button primary" id="learnButton" type="button">Learn next control</button>
             <button class="button apply" id="applyButton" type="button" disabled>Apply</button>
             <button class="button" id="refreshButton" type="button">Refresh</button>
+          </div>
+          <div class="preset-bar">
+            <select id="presetSelect" aria-label="Preset"></select>
+            <button class="button" id="loadPresetButton" type="button" disabled>Load</button>
+            <button class="button apply" id="savePresetButton" type="button" disabled>Save</button>
+            <button class="button" id="saveAsPresetButton" type="button">Save As</button>
+            <button class="button danger" id="deletePresetButton" type="button" disabled>Delete</button>
           </div>
           <section class="controllers" id="controllers"></section>
           <section class="board" id="board"></section>
@@ -2162,9 +2523,13 @@ def build_app_html():
       appliedRules: new Set(),
       inputs: [],
       controllers: [],
+      presets: [],
+      selectedPresetId: null,
       activitySource: null,
       activityAbort: null,
       activityTimers: new Map(),
+      lastActivityInput: null,
+      lastActivityTimer: null,
     };
 
     const templateSelect = document.querySelector("#templateSelect");
@@ -2172,16 +2537,230 @@ def build_app_html():
     const controllers = document.querySelector("#controllers");
     const board = document.querySelector("#board");
     const status = document.querySelector("#status");
+    const statusPanel = document.querySelector("#statusPanel");
+    const midiStatusButton = document.querySelector("#midiStatusButton");
+    const midiStatusLabel = document.querySelector("#midiStatusLabel");
+    const midiStatusPopover = document.querySelector("#midiStatusPopover");
     const learnButton = document.querySelector("#learnButton");
     const applyButton = document.querySelector("#applyButton");
     const refreshButton = document.querySelector("#refreshButton");
+    const presetSelect = document.querySelector("#presetSelect");
+    const loadPresetButton = document.querySelector("#loadPresetButton");
+    const savePresetButton = document.querySelector("#savePresetButton");
+    const saveAsPresetButton = document.querySelector("#saveAsPresetButton");
+    const deletePresetButton = document.querySelector("#deletePresetButton");
 
     function setStatus(text) {
       status.textContent = text;
     }
 
+    function midiDeviceItems() {
+      const controllerItems = state.controllers
+        .filter((controller) => Array.isArray(controller.inputs) && controller.inputs.length)
+        .map((controller) => ({
+          id: controller.id || controller.input || controller.name,
+          name: controller.template_name || controller.name || controller.input,
+          input: controller.input || controller.inputs[0],
+          inputs: controller.inputs,
+          outputs: controller.outputs || [],
+          templateId: controller.template_id,
+          templateName: controller.template_name,
+          virtual: Boolean(controller.virtual),
+        }));
+
+      if (controllerItems.length) return controllerItems;
+
+      return state.inputs.map((input) => ({
+        id: input,
+        name: input,
+        input,
+        inputs: [input],
+        outputs: [],
+        templateId: null,
+        templateName: null,
+        virtual: false,
+      }));
+    }
+
+    function inputIsActive(item) {
+      return Boolean(state.lastActivityInput && item.inputs.includes(state.lastActivityInput));
+    }
+
+    function renderMidiStatus() {
+      const items = midiDeviceItems();
+      if (!items.length) {
+        midiStatusLabel.textContent = "No MIDI inputs detected";
+      } else if (items.length === 1) {
+        midiStatusLabel.textContent = `Listening for MIDI: ${items[0].name}`;
+      } else if (state.lastActivityInput) {
+        const activeItem = items.find((item) => item.inputs.includes(state.lastActivityInput));
+        midiStatusLabel.textContent = activeItem
+          ? `Listening: ${activeItem.name} +${items.length - 1}`
+          : `Listening for MIDI: ${items.length} devices`;
+      } else {
+        midiStatusLabel.textContent = `Listening for MIDI: ${items.length} devices`;
+      }
+
+      const title = document.createElement("div");
+      title.className = "midi-popover-title";
+      title.textContent = items.length
+        ? items.length === 1 ? "Listening to 1 device" : `Listening to ${items.length} devices`
+        : "No MIDI inputs";
+
+      midiStatusPopover.innerHTML = "";
+      midiStatusPopover.append(title);
+
+      if (!items.length) {
+        const empty = document.createElement("div");
+        empty.className = "midi-popover-empty";
+        empty.textContent = "Connect a MIDI controller, then refresh.";
+        midiStatusPopover.append(empty);
+        return;
+      }
+
+      const list = document.createElement("div");
+      list.className = "midi-device-list";
+      for (const item of items) {
+        const device = document.createElement("button");
+        device.type = "button";
+        device.className = [
+          "midi-device",
+          item.input && item.input === inputSelect.value ? "selected" : "",
+          inputIsActive(item) ? "receiving" : "",
+        ].filter(Boolean).join(" ");
+        device.setAttribute("role", "option");
+        device.setAttribute("aria-selected", item.input && item.input === inputSelect.value ? "true" : "false");
+
+        const dot = document.createElement("span");
+        dot.className = "midi-device-dot";
+        dot.setAttribute("aria-hidden", "true");
+
+        const copy = document.createElement("span");
+        const name = document.createElement("span");
+        name.className = "midi-device-name";
+        name.textContent = item.name;
+        const meta = document.createElement("span");
+        meta.className = "midi-device-meta";
+        const kind = item.templateName ? "recognized" : item.virtual ? "virtual" : "unknown";
+        const ports = `${item.inputs.length} in / ${item.outputs.length} out`;
+        const active = inputIsActive(item) ? " - receiving" : "";
+        meta.textContent = item.input ? `${kind} - ${item.input} - ${ports}${active}` : `${kind} - ${ports}${active}`;
+        copy.append(name, meta);
+
+        device.append(dot, copy);
+        device.addEventListener("click", () => {
+          selectMidiDevice(item);
+          closeMidiPopover();
+        });
+        list.append(device);
+      }
+      midiStatusPopover.append(list);
+    }
+
+    function selectMidiDevice(item) {
+      if (item.templateId) {
+        state.selectedTemplateId = item.templateId;
+      }
+      if (item.input) {
+        state.selectedInput = item.input;
+      }
+      renderSelects();
+      renderControllers();
+      renderBoard();
+      startActivityStream();
+      renderPresets();
+      setStatus(`${item.name} selected`);
+    }
+
+    function openMidiPopover() {
+      midiStatusPopover.hidden = false;
+      midiStatusButton.setAttribute("aria-expanded", "true");
+    }
+
+    function closeMidiPopover() {
+      midiStatusPopover.hidden = true;
+      midiStatusButton.setAttribute("aria-expanded", "false");
+    }
+
     function selectedTemplate() {
       return state.templates.find((template) => template.id === state.selectedTemplateId) || state.templates[0];
+    }
+
+    function selectedPreset() {
+      return state.presets.find((preset) => preset.id === state.selectedPresetId) || null;
+    }
+
+    function sortedRules(rules) {
+      return [...rules].sort();
+    }
+
+    function sameRuleList(left, right) {
+      const leftRules = sortedRules(left || []);
+      const rightRules = sortedRules(right || []);
+      return leftRules.length === rightRules.length && leftRules.every((rule, index) => rule === rightRules[index]);
+    }
+
+    function currentPresetPayload(name, id = null) {
+      const template = selectedTemplate();
+      return {
+        id,
+        name,
+        template_id: template?.id || state.selectedTemplateId,
+        template_name: template?.name || "",
+        input_name: inputSelect.value || state.selectedInput || "",
+        blocked_rules: sortedRules(state.rules),
+      };
+    }
+
+    function presetHasUnsavedChanges() {
+      const preset = selectedPreset();
+      if (!preset) return false;
+      const templateId = selectedTemplate()?.id || state.selectedTemplateId || null;
+      const inputName = inputSelect.value || state.selectedInput || "";
+      return preset.template_id !== templateId
+        || (preset.input_name || "") !== inputName
+        || !sameRuleList(preset.blocked_rules, state.rules);
+    }
+
+    function renderPresets() {
+      presetSelect.innerHTML = "";
+      const hasPresets = state.presets.length > 0;
+      presetSelect.disabled = !hasPresets;
+
+      if (!hasPresets) {
+        const option = document.createElement("option");
+        option.value = "";
+        option.textContent = "No saved presets";
+        presetSelect.append(option);
+        state.selectedPresetId = null;
+      } else {
+        const placeholder = document.createElement("option");
+        placeholder.value = "";
+        placeholder.textContent = "Preset: none selected";
+        presetSelect.append(placeholder);
+
+        for (const preset of state.presets) {
+          const option = document.createElement("option");
+          option.value = preset.id;
+          const dirty = preset.id === state.selectedPresetId && presetHasUnsavedChanges() ? " *" : "";
+          option.textContent = `${preset.name}${dirty}`;
+          presetSelect.append(option);
+        }
+
+        if (state.selectedPresetId && state.presets.some((preset) => preset.id === state.selectedPresetId)) {
+          presetSelect.value = state.selectedPresetId;
+        } else {
+          state.selectedPresetId = null;
+          presetSelect.value = "";
+        }
+      }
+
+      const preset = selectedPreset();
+      const dirty = presetHasUnsavedChanges();
+      loadPresetButton.disabled = !preset;
+      savePresetButton.disabled = !preset;
+      savePresetButton.textContent = dirty ? "Save *" : "Save";
+      deletePresetButton.disabled = !preset;
     }
 
     function groupControls(controls) {
@@ -2201,14 +2780,21 @@ def build_app_html():
         option.textContent = template.name;
         templateSelect.append(option);
       }
-      if (state.selectedTemplateId) {
+      const templateIds = state.templates.map((template) => template.id);
+      if (state.selectedTemplateId && templateIds.includes(state.selectedTemplateId)) {
+        templateSelect.value = state.selectedTemplateId;
+      } else if (state.templates.length) {
+        state.selectedTemplateId = state.templates[0].id;
         templateSelect.value = state.selectedTemplateId;
       }
 
       inputSelect.innerHTML = "";
       const template = selectedTemplate();
       const preferredInput = template ? template.input_name : "";
-      const inputNames = state.inputs.length ? state.inputs : [preferredInput].filter(Boolean);
+      const inputNames = state.inputs.length ? [...state.inputs] : [preferredInput].filter(Boolean);
+      if (state.selectedInput && !inputNames.includes(state.selectedInput)) {
+        inputNames.push(state.selectedInput);
+      }
       for (const input of inputNames) {
         const option = document.createElement("option");
         option.value = input;
@@ -2222,6 +2808,7 @@ def build_app_html():
         inputSelect.value = preferredInput;
         state.selectedInput = preferredInput;
       }
+      renderMidiStatus();
     }
 
     function renderControllers() {
@@ -2270,6 +2857,7 @@ def build_app_html():
       }
 
       controllers.append(title, list);
+      renderMidiStatus();
     }
 
     function selectController(controller) {
@@ -2283,6 +2871,7 @@ def build_app_html():
       renderControllers();
       renderBoard();
       startActivityStream();
+      renderPresets();
       setStatus(`${controller.name} selected`);
     }
 
@@ -2312,6 +2901,7 @@ def build_app_html():
       const count = changedRules().size;
       applyButton.disabled = count === 0;
       applyButton.textContent = count ? `Apply (${count})` : "Apply";
+      renderPresets();
     }
 
     function controlFace(control) {
@@ -2627,6 +3217,16 @@ def build_app_html():
     }
 
     function markMoved(rule, inputName) {
+      if (inputName) {
+        state.lastActivityInput = inputName;
+        if (state.lastActivityTimer) clearTimeout(state.lastActivityTimer);
+        state.lastActivityTimer = setTimeout(() => {
+          state.lastActivityInput = null;
+          state.lastActivityTimer = null;
+          renderMidiStatus();
+        }, 2200);
+        renderMidiStatus();
+      }
       if (state.rules.has(rule)) return;
       const matchedControls = [...document.querySelectorAll(`.control[data-rules~="${CSS.escape(rule)}"]`)];
       if (!matchedControls.length) {
@@ -2663,11 +3263,17 @@ def build_app_html():
       });
       source.addEventListener("ready", (event) => {
         const data = JSON.parse(event.data);
-        if (data.status) setStatus(`${data.status}: ${data.inputs.join(", ")}`);
+        if (Array.isArray(data.inputs)) {
+          state.inputs = data.inputs;
+          renderMidiStatus();
+        }
       });
       source.addEventListener("heartbeat", (event) => {
         const data = JSON.parse(event.data);
-        if (data.status && !state.activityTimers.size) setStatus(`${data.status}: ${data.inputs.join(", ")}`);
+        if (Array.isArray(data.inputs)) {
+          state.inputs = data.inputs;
+          renderMidiStatus();
+        }
       });
       source.addEventListener("error", () => {
         if (state.activitySource === source) {
@@ -2700,7 +3306,8 @@ def build_app_html():
             const data = JSON.parse(dataLine.slice(6));
             if (data.rule) markMoved(data.rule, data.input);
             if (data.status && Array.isArray(data.inputs) && !state.activityTimers.size) {
-              setStatus(`${data.status}: ${data.inputs.join(", ")}`);
+              state.inputs = data.inputs;
+              renderMidiStatus();
             }
             if (data.error) setStatus(data.error);
           }
@@ -2726,6 +3333,7 @@ def build_app_html():
       const data = await fetchJson("/api/state");
       state.templates = data.templates;
       state.controllers = data.controllers || [];
+      state.presets = data.presets || [];
       const detected = state.controllers.find((controller) => controller.template_id);
       state.selectedTemplateId = state.selectedTemplateId || detected?.template_id || data.templates[0]?.id || null;
       state.selectedInput = state.selectedInput || detected?.input || null;
@@ -2735,8 +3343,10 @@ def build_app_html():
       renderSelects();
       renderControllers();
       renderBoard();
+      renderMidiStatus();
       startActivityStream();
       updateApplyState();
+      renderPresets();
       setStatus(`${state.rules.size} blocked controls`);
     }
 
@@ -2769,6 +3379,77 @@ def build_app_html():
       setStatus(`${state.rules.size} bypassed controls applied`);
     }
 
+    async function savePreset(name, id = null) {
+      const data = await fetchJson("/api/presets/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(currentPresetPayload(name, id)),
+      });
+      state.presets = data.presets || [];
+      state.selectedPresetId = data.preset.id;
+      renderPresets();
+      setStatus(`${data.preset.name} preset saved`);
+    }
+
+    async function saveSelectedPreset() {
+      const preset = selectedPreset();
+      if (!preset) {
+        await savePresetAs();
+        return;
+      }
+      await savePreset(preset.name, preset.id);
+    }
+
+    async function savePresetAs() {
+      const template = selectedTemplate();
+      const defaultName = selectedPreset()?.name || `${template?.name || "MIDI controller"} repair`;
+      const name = window.prompt("Preset name", defaultName);
+      if (!name || !name.trim()) return;
+      await savePreset(name.trim());
+    }
+
+    async function loadSelectedPreset() {
+      const preset = selectedPreset();
+      if (!preset) return;
+      if (presetHasUnsavedChanges() && !window.confirm("Load this preset and replace the current bypasses?")) {
+        return;
+      }
+      const data = await fetchJson("/api/presets/load", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: preset.id }),
+      });
+      state.presets = data.presets || [];
+      state.selectedPresetId = data.preset.id;
+      if (state.templates.some((template) => template.id === data.preset.template_id)) {
+        state.selectedTemplateId = data.preset.template_id;
+      }
+      state.selectedInput = data.preset.input_name || state.selectedInput;
+      state.rules = new Set(data.blocked_rules);
+      state.appliedRules = new Set(data.blocked_rules);
+      renderSelects();
+      renderControllers();
+      renderBoard();
+      startActivityStream();
+      updateApplyState();
+      setStatus(`${data.preset.name} preset loaded`);
+    }
+
+    async function deleteSelectedPreset() {
+      const preset = selectedPreset();
+      if (!preset) return;
+      if (!window.confirm(`Delete "${preset.name}" preset?`)) return;
+      const data = await fetchJson("/api/presets/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: preset.id }),
+      });
+      state.presets = data.presets || [];
+      state.selectedPresetId = null;
+      renderPresets();
+      setStatus(`${preset.name} preset deleted`);
+    }
+
     async function learnNextControl() {
       learnButton.disabled = true;
       setStatus("Listening for MIDI");
@@ -2794,12 +3475,18 @@ def build_app_html():
       renderSelects();
       renderControllers();
       renderBoard();
+      renderPresets();
       startActivityStream();
     });
     inputSelect.addEventListener("change", () => {
       state.selectedInput = inputSelect.value;
       renderControllers();
+      renderPresets();
       startActivityStream();
+    });
+    presetSelect.addEventListener("change", () => {
+      state.selectedPresetId = presetSelect.value || null;
+      renderPresets();
     });
     refreshButton.addEventListener("click", () => loadState().catch((error) => setStatus(error.message)));
     learnButton.addEventListener("click", () => learnNextControl().catch((error) => setStatus(error.message)));
@@ -2807,6 +3494,23 @@ def build_app_html():
       setStatus(error.message);
       updateApplyState();
     }));
+    loadPresetButton.addEventListener("click", () => loadSelectedPreset().catch((error) => setStatus(error.message)));
+    savePresetButton.addEventListener("click", () => saveSelectedPreset().catch((error) => setStatus(error.message)));
+    saveAsPresetButton.addEventListener("click", () => savePresetAs().catch((error) => setStatus(error.message)));
+    deletePresetButton.addEventListener("click", () => deleteSelectedPreset().catch((error) => setStatus(error.message)));
+    midiStatusButton.addEventListener("click", () => {
+      if (midiStatusPopover.hidden) {
+        openMidiPopover();
+      } else {
+        closeMidiPopover();
+      }
+    });
+    document.addEventListener("click", (event) => {
+      if (!statusPanel.contains(event.target)) closeMidiPopover();
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") closeMidiPopover();
+    });
 
     loadState().catch((error) => setStatus(error.message));
   </script>
@@ -2861,6 +3565,8 @@ class MidiFixHandler(BaseHTTPRequestHandler):
                 self.send_html(build_app_html())
             elif route == "/api/state":
                 self.send_json(self.api_state())
+            elif route == "/api/presets":
+                self.send_json(self.api_presets())
             elif route == "/api/activity":
                 self.api_activity(parse_qs(parsed.query))
             else:
@@ -2875,6 +3581,12 @@ class MidiFixHandler(BaseHTTPRequestHandler):
                 self.send_json(self.api_blocks(read_json(self)))
             elif route == "/api/blocks/apply":
                 self.send_json(self.api_blocks_apply(read_json(self)))
+            elif route == "/api/presets/save":
+                self.send_json(self.api_preset_save(read_json(self)))
+            elif route == "/api/presets/load":
+                self.send_json(self.api_preset_load(read_json(self)))
+            elif route == "/api/presets/delete":
+                self.send_json(self.api_preset_delete(read_json(self)))
             elif route == "/api/learn":
                 self.send_json(self.api_learn(read_json(self)))
             else:
@@ -2891,16 +3603,21 @@ class MidiFixHandler(BaseHTTPRequestHandler):
         input_names = monitor["inputs"]
         output_names = monitor["outputs"]
         return {
-            "app": "midifix",
+            "app": "INFINIGHT MidiSurgeon",
             "block_file": str(self.state.block_file),
+            "preset_dir": str(self.state.preset_dir),
             "blocked_rules": [tuple_to_rule_text(rule) for rule in sorted(rules)],
             "templates": templates,
+            "presets": self.state.list_presets(),
             "controllers": discover_controllers(templates, input_names, output_names),
             "inputs": input_names,
             "input_error": "; ".join(monitor["errors"]) if monitor["errors"] else None,
             "outputs": output_names,
             "output_error": None,
         }
+
+    def api_presets(self):
+        return {"presets": self.state.list_presets()}
 
     def api_blocks(self, payload):
         rule, rules = self.state.set_blocked(payload["rule"], bool(payload["blocked"]))
@@ -2918,6 +3635,26 @@ class MidiFixHandler(BaseHTTPRequestHandler):
         return {
             "blocked_rules": [tuple_to_rule_text(item) for item in sorted(rules)],
         }
+
+    def api_preset_save(self, payload):
+        preset = self.state.save_preset(payload)
+        return {
+            "preset": preset,
+            "presets": self.state.list_presets(),
+        }
+
+    def api_preset_load(self, payload):
+        preset = self.state.load_preset(payload.get("id"))
+        rules = self.state.set_rules(preset["blocked_rules"])
+        return {
+            "preset": preset,
+            "presets": self.state.list_presets(),
+            "blocked_rules": [tuple_to_rule_text(item) for item in sorted(rules)],
+        }
+
+    def api_preset_delete(self, payload):
+        self.state.delete_preset(payload.get("id"))
+        return {"presets": self.state.list_presets()}
 
     def api_learn(self, payload):
         input_name = payload.get("input") or "Launch Control XL"
@@ -3002,12 +3739,13 @@ class MidiFixServer(ThreadingHTTPServer):
 def serve(args):
     port = find_available_port(args.port)
     ACTIVITY_MONITOR.ensure_started()
-    state = MidiFixState(args.block_file)
+    state = MidiFixState(args.block_file, args.preset_dir)
     handler = type("ConfiguredMidiFixHandler", (MidiFixHandler,), {"state": state})
     server = MidiFixServer((args.host, port), handler)
     url = f"http://{args.host}:{port}"
-    print(f"midifix is running at {url}", flush=True)
+    print(f"INFINIGHT MidiSurgeon is running at {url}", flush=True)
     print(f"Blocklist: {Path(args.block_file).expanduser()}", flush=True)
+    print(f"Presets: {state.preset_dir}", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
@@ -3024,6 +3762,11 @@ def main(argv=None):
         "--block-file",
         default=DEFAULT_BLOCK_FILE,
         help="path to the blocklist controlled by the UI",
+    )
+    parser.add_argument(
+        "--preset-dir",
+        default=DEFAULT_PRESET_DIR,
+        help="directory for saved presets",
     )
     args = parser.parse_args(argv)
     serve(args)

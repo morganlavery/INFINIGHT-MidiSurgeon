@@ -4,11 +4,11 @@
 <plist version="1.0">
 <dict>
   <key>CFBundleName</key>
-  <string>midifix</string>
+  <string>MidiSurgeon</string>
   <key>CFBundleDisplayName</key>
-  <string>midifix</string>
+  <string>INFINIGHT MidiSurgeon</string>
   <key>CFBundleIdentifier</key>
-  <string>com.local.midifix.desktop</string>
+  <string>com.infinight.midisurgeon.desktop</string>
   <key>CFBundleVersion</key>
   <string>1.0</string>
   <key>CFBundleShortVersionString</key>

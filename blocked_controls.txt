@@ -1,30 +1,6 @@
-# MIDI controls blocked by midifix.
+# MIDI controls blocked by INFINIGHT MidiSurgeon.
 # Format: cc:<midi-channel>:<cc-number> or note:<midi-channel>:<note-number>
 # Example: cc:1:77
 
-cc:1:13
-cc:1:14
-cc:1:15
-cc:1:16
-cc:1:17
-cc:1:18
-cc:1:19
-cc:1:20
-cc:1:29
-cc:1:30
-cc:1:31
-cc:1:32
-cc:1:33
-cc:1:34
-cc:1:35
-cc:1:36
-cc:1:49
-cc:1:50
-cc:1:51
-cc:1:52
-cc:1:53
-cc:1:54
-cc:1:55
-cc:1:56
 cc:1:77
 cc:1:79

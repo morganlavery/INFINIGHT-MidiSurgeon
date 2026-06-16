@@ -4,11 +4,11 @@ set -euo pipefail
 ROOT_DIR="${0:A:h}"
 BUILD_DIR="$ROOT_DIR/build/dmg"
 DIST_DIR="$ROOT_DIR/dist"
-APP_NAME="midifix.app"
+APP_NAME="INFINIGHT MidiSurgeon.app"
 APP_OUT="$BUILD_DIR/$APP_NAME"
 APP_RESOURCES="$APP_OUT/Contents/Resources"
 DMG_STAGING="$ROOT_DIR/build/dmg-staging"
-DMG_PATH="$DIST_DIR/midifix.dmg"
+DMG_PATH="$DIST_DIR/INFINIGHT-MidiSurgeon.dmg"
 
 rm -rf "$BUILD_DIR" "$DMG_STAGING"
 mkdir -p "$APP_OUT/Contents/MacOS" "$APP_RESOURCES/app" "$DIST_DIR" "$DMG_STAGING"
@@ -39,7 +39,7 @@ ln -s /Applications "$DMG_STAGING/Applications"
 
 rm -f "$DMG_PATH"
 hdiutil create \
-  -volname "midifix" \
+  -volname "INFINIGHT MidiSurgeon" \
   -srcfolder "$DMG_STAGING" \
   -ov \
   -format UDZO \
