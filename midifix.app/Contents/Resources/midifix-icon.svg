@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <title>midifix icon</title>
+  <g transform="translate(0 36)">
+    <ellipse cx="512" cy="820" rx="340" ry="54" fill="#31100f" opacity=".22"/>
+    <path d="M192 552c0-70 57-127 127-127h386c70 0 127 57 127 127v108c0 86-70 156-156 156H348c-86 0-156-70-156-156Z" fill="#6b351d" stroke="#31100f" stroke-width="48" stroke-linejoin="round"/>
+    <path d="M300 340c0-70 57-127 127-127h226c70 0 127 57 127 127v71c0 70-57 127-127 127H427c-70 0-127-57-127-127Z" fill="#6b351d" stroke="#31100f" stroke-width="48" stroke-linejoin="round"/>
+    <path d="M488 136c15-77 90-127 167-112 77 15 127 90 112 167l-20 99c-15 77-90 127-167 112-77-15-127-90-112-167Z" fill="#6b351d" stroke="#31100f" stroke-width="48" stroke-linejoin="round"/>
+    <ellipse cx="360" cy="640" rx="57" ry="38" fill="#fff6b7" opacity=".62" transform="rotate(-18 360 640)"/>
+  </g>
+</svg>

@@ -197,6 +197,11 @@ class MidiFixState:
         self.save_rules(rules)
         return tuple_to_rule_text(rule), rules
 
+    def set_rules(self, rule_texts):
+        rules = {rule_text_to_tuple(rule_text) for rule_text in rule_texts}
+        self.save_rules(rules)
+        return rules
+
 
 class ActivityMonitor:
     def __init__(self):
@@ -328,8 +333,12 @@ def build_app_html():
       --surface: #ffe04d;
       --accent: #c91822;
       --accent-weak: #fff3a6;
+      --passing: #18a957;
+      --passing-weak: #d9f6c2;
       --danger: #bd111b;
       --danger-weak: #f9c9bd;
+      --warning: #ffd84f;
+      --warning-strong: #d79a00;
       --activity: #ffffff;
       --activity-strong: #e00013;
       --shadow: 0 22px 48px rgba(56, 26, 16, 0.28);
@@ -626,7 +635,7 @@ def build_app_html():
 
     .toolbar {
       display: grid;
-      grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr) auto auto;
+      grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr) auto auto auto;
       gap: 10px;
       align-items: center;
       margin-bottom: 18px;
@@ -655,6 +664,12 @@ def build_app_html():
       background: var(--accent);
       border-color: var(--accent);
       color: #fff7bf;
+    }
+
+    .button.apply {
+      background: var(--passing);
+      border-color: #0f7d3d;
+      color: #f7fff4;
     }
 
     .button:disabled {
@@ -793,25 +808,54 @@ def build_app_html():
       color: #5f1010;
     }
 
-    .control.active {
-      border-color: #8f0b15;
-      background: #ffd8c5;
+    .control.active:not(.visual-only) {
+      border-color: #0f7d3d;
+      background: var(--passing-weak);
+      box-shadow:
+        inset 0 0 0 3px #0f7d3d,
+        inset 0 4px 12px rgba(15, 125, 61, 0.2),
+        0 0 0 2px rgba(24, 169, 87, 0.22),
+        0 2px 0 rgba(255, 255, 255, 0.35);
     }
 
     .control.moving {
-      border-color: var(--activity-strong);
+      border-color: var(--warning-strong);
+      background: var(--warning);
       box-shadow:
         0 0 0 4px rgba(255, 255, 255, 0.9),
-        0 0 24px rgba(224, 0, 19, 0.75);
+        0 0 24px rgba(215, 154, 0, 0.78);
       transform: translateY(-1px);
+      animation: activityPulse 0.34s ease-in-out infinite alternate;
     }
 
     .control.moving .knob-face,
     .control.moving .fader-face::after,
     .control.moving .pad-face,
     .control.moving .button-face {
-      border-color: var(--activity-strong);
-      background-color: var(--activity);
+      border-color: var(--warning-strong);
+      background-color: var(--warning);
+    }
+
+    .control.pending-change::after {
+      content: "";
+      position: absolute;
+      top: 7px;
+      right: 7px;
+      width: 11px;
+      height: 11px;
+      border: 2px solid rgba(49, 16, 15, 0.72);
+      border-radius: 50%;
+      background: #fff6b7;
+      box-shadow: 0 1px 0 rgba(255, 255, 255, 0.65) inset;
+    }
+
+    @keyframes activityPulse {
+      from {
+        filter: saturate(1);
+      }
+      to {
+        filter: saturate(1.35) brightness(1.08);
+      }
     }
 
     .knob-face {
@@ -905,6 +949,14 @@ def build_app_html():
     .control.blocked .button-face {
       border-color: var(--danger);
       background-color: var(--danger);
+    }
+
+    .control.active:not(.visual-only) .knob-face,
+    .control.active:not(.visual-only) .fader-face::after,
+    .control.active:not(.visual-only) .pad-face,
+    .control.active:not(.visual-only) .button-face {
+      border-color: #0f7d3d;
+      background-color: var(--passing);
     }
 
     .control.visual-only {
@@ -1056,9 +1108,13 @@ def build_app_html():
         0 1px 0 rgba(255, 255, 255, 0.08);
     }
 
-    .lcxl-board .control.active {
-      background: #34383a;
-      border-color: #151719;
+    .lcxl-board .control.active:not(.visual-only) {
+      background: rgba(24, 169, 87, 0.2);
+      border-color: var(--passing);
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+        0 0 0 2px rgba(24, 169, 87, 0.55),
+        0 0 14px rgba(24, 169, 87, 0.34);
     }
 
     .lcxl-board .control.visual-only {
@@ -1142,6 +1198,19 @@ def build_app_html():
       box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28);
     }
 
+    .lcxl-board .control.active:not(.visual-only) .knob-face {
+      box-shadow:
+        0 0 0 2px #b7bdba,
+        0 0 0 5px var(--passing),
+        0 0 16px rgba(24, 169, 87, 0.62);
+    }
+
+    .lcxl-board .control.active:not(.visual-only) .fader-face::after,
+    .lcxl-board .control.active:not(.visual-only) .button-face {
+      border-color: #0f7d3d;
+      background: linear-gradient(#7df0a8, #18a957);
+    }
+
     .lcxl-board .control-template-user .button-face,
     .lcxl-board .control-track-control-1 .button-face,
     .lcxl-board .control-track-control-2 .button-face,
@@ -1179,6 +1248,12 @@ def build_app_html():
       background: linear-gradient(#7ec4ff, #2785c6);
     }
 
+    .lcxl-board .control.active:not(.visual-only) .fader-face::after,
+    .lcxl-board .control.active:not(.visual-only) .button-face {
+      border-color: #0f7d3d;
+      background: linear-gradient(#7df0a8, #18a957);
+    }
+
     .lcxl-board .label {
       max-width: 100%;
       font-size: 11px;
@@ -1194,6 +1269,699 @@ def build_app_html():
 
     .lcxl-board .visual-only .rule {
       display: none;
+    }
+
+    .lpx-board {
+      width: min(760px, 100%);
+      margin: 0 auto;
+      padding: 16px;
+      border: 3px solid #070809;
+      border-radius: 12px;
+      background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.09), transparent 34%),
+        #121416;
+      color: #f3f5ef;
+      box-shadow:
+        inset 0 0 0 2px rgba(255, 255, 255, 0.05),
+        inset 0 0 40px rgba(0, 0, 0, 0.48),
+        0 18px 34px rgba(58, 29, 13, 0.28);
+      overflow-x: auto;
+    }
+
+    .lpx-panel {
+      display: grid;
+      gap: 8px;
+      min-width: 556px;
+    }
+
+    .lpx-brand {
+      min-height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 3px 2px;
+      color: #edf1eb;
+      font-weight: 850;
+      text-transform: uppercase;
+    }
+
+    .lpx-brand .novation {
+      font-size: 18px;
+      text-transform: lowercase;
+    }
+
+    .lpx-brand .model {
+      color: #bec6c3;
+      font-size: 12px;
+      letter-spacing: 0;
+    }
+
+    .lpx-top-shell,
+    .lpx-main {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 58px;
+      gap: 8px;
+      align-items: stretch;
+    }
+
+    .lpx-top-row,
+    .lpx-pad-grid {
+      display: grid;
+      grid-template-columns: repeat(8, minmax(0, 1fr));
+      gap: 6px;
+    }
+
+    .lpx-top-row {
+      align-items: stretch;
+    }
+
+    .lpx-logo-tile {
+      display: grid;
+      place-items: center;
+      min-height: 44px;
+      border: 1px solid #30363a;
+      border-radius: 4px;
+      background: #202528;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+    }
+
+    .lpx-logo-mark {
+      width: 26px;
+      height: 26px;
+      border-radius: 4px;
+      background:
+        linear-gradient(135deg, transparent 0 34%, #eef2ed 35% 63%, transparent 64%) center/100% 100% no-repeat,
+        linear-gradient(45deg, transparent 0 26%, #eef2ed 27% 48%, transparent 49%) center/100% 100% no-repeat;
+      transform: rotate(-4deg);
+    }
+
+    .lpx-pad-grid {
+      align-content: start;
+    }
+
+    .lpx-grid-row {
+      display: contents;
+    }
+
+    .lpx-side {
+      display: grid;
+      grid-template-rows: repeat(8, minmax(0, 1fr));
+      gap: 6px;
+    }
+
+    .lpx-board .control {
+      min-width: 0;
+      min-height: 44px;
+      padding: 4px;
+      gap: 2px;
+      border-color: #070809;
+      border-radius: 4px;
+      background: #202528;
+      color: #edf1eb;
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.07),
+        0 1px 0 rgba(255, 255, 255, 0.06);
+    }
+
+    .lpx-board .control.visual-only {
+      opacity: 0.92;
+    }
+
+    .lpx-board .control.active:not(.visual-only) {
+      background: #202528;
+      border-color: var(--passing);
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.07),
+        0 0 0 2px rgba(24, 169, 87, 0.52),
+        0 0 14px rgba(24, 169, 87, 0.28);
+    }
+
+    .lpx-board .control.blocked {
+      background: #4b1e23;
+      border-color: #ef3340;
+      color: #fff0eb;
+    }
+
+    .lpx-board .control.moving {
+      border-color: #f4f4ee;
+      box-shadow:
+        0 0 0 3px rgba(255, 255, 255, 0.82),
+        0 0 24px rgba(0, 210, 255, 0.78);
+    }
+
+    .lpx-board .type-pad {
+      aspect-ratio: 1;
+      min-height: 54px;
+      grid-template-rows: 1fr auto;
+      padding: 5px;
+    }
+
+    .lpx-board .type-button {
+      min-height: 44px;
+    }
+
+    .lpx-board .pad-face {
+      width: 100%;
+      height: auto;
+      aspect-ratio: 1;
+      border-color: #070809;
+      border-radius: 6px;
+      background: linear-gradient(#f6ef7d, #e0c52d);
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.28),
+        inset 0 -7px 12px rgba(0, 0, 0, 0.18),
+        0 0 14px rgba(246, 239, 125, 0.22);
+    }
+
+    .lpx-grid-row .type-pad:nth-child(2) .pad-face {
+      background: linear-gradient(#ff8079, #dc353d);
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.28),
+        inset 0 -7px 12px rgba(0, 0, 0, 0.18),
+        0 0 14px rgba(255, 70, 74, 0.24);
+    }
+
+    .lpx-grid-row .type-pad:nth-child(3) .pad-face {
+      background: linear-gradient(#80cdff, #2d8bd4);
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.28),
+        inset 0 -7px 12px rgba(0, 0, 0, 0.18),
+        0 0 14px rgba(72, 167, 240, 0.24);
+    }
+
+    .lpx-grid-row .type-pad:nth-child(4) .pad-face {
+      background: linear-gradient(#ff7cf0, #c830bf);
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.28),
+        inset 0 -7px 12px rgba(0, 0, 0, 0.18),
+        0 0 14px rgba(255, 92, 232, 0.24);
+    }
+
+    .lpx-grid-row .type-pad:nth-child(5) .pad-face {
+      background: linear-gradient(#75f4f1, #25babe);
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.28),
+        inset 0 -7px 12px rgba(0, 0, 0, 0.18),
+        0 0 14px rgba(87, 229, 230, 0.24);
+    }
+
+    .lpx-grid-row .type-pad:nth-child(6) .pad-face {
+      background: linear-gradient(#7ef97b, #31cc4f);
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.28),
+        inset 0 -7px 12px rgba(0, 0, 0, 0.18),
+        0 0 14px rgba(93, 235, 98, 0.24);
+    }
+
+    .lpx-grid-row .type-pad:nth-child(7) .pad-face {
+      background: linear-gradient(#ffe98a, #d99d27);
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.28),
+        inset 0 -7px 12px rgba(0, 0, 0, 0.18),
+        0 0 14px rgba(255, 213, 84, 0.24);
+    }
+
+    .lpx-grid-row .type-pad:nth-child(8) .pad-face {
+      background: linear-gradient(#bd8bff, #7d43d8);
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.28),
+        inset 0 -7px 12px rgba(0, 0, 0, 0.18),
+        0 0 14px rgba(170, 117, 255, 0.24);
+    }
+
+    .lpx-board .button-face {
+      width: 100%;
+      height: 19px;
+      border-color: #070809;
+      border-radius: 3px;
+      background: linear-gradient(#30383c, #171b1e);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+    }
+
+    .lpx-board .control-mode-session .button-face {
+      background: linear-gradient(#8a85ff, #5149c9);
+    }
+
+    .lpx-board .control-mode-note .button-face {
+      background: linear-gradient(#a2e878, #43ba4f);
+    }
+
+    .lpx-board .control-mode-custom .button-face {
+      background: linear-gradient(#f6d86f, #ca9432);
+    }
+
+    .lpx-board .control-capture-midi .button-face {
+      background: linear-gradient(#ff8782, #ca3340);
+    }
+
+    .lpx-board .control-scene-volume .button-face,
+    .lpx-board .control-scene-pan .button-face,
+    .lpx-board .control-scene-send-a .button-face,
+    .lpx-board .control-scene-send-b .button-face,
+    .lpx-board .control-scene-stop-clip .button-face,
+    .lpx-board .control-scene-mute .button-face,
+    .lpx-board .control-scene-solo .button-face,
+    .lpx-board .control-scene-record-arm .button-face {
+      background: linear-gradient(#323a3f, #15191c);
+    }
+
+    .lpx-board .control.active:not(.visual-only) .pad-face,
+    .lpx-board .control.active:not(.visual-only) .button-face {
+      border-color: #0f7d3d;
+    }
+
+    .lpx-board .control.blocked .pad-face,
+    .lpx-board .control.blocked .button-face {
+      border-color: #ef3340;
+      background: linear-gradient(#ff8278, #bd111b);
+    }
+
+    .lpx-board .label {
+      max-width: 100%;
+      min-height: 11px;
+      font-size: 9px;
+      line-height: 1.15;
+      overflow-wrap: anywhere;
+      text-align: center;
+    }
+
+    .lpx-board .rule {
+      color: #aeb6b3;
+      font-size: 8px;
+      line-height: 1;
+    }
+
+    .lpx-board .type-pad .rule,
+    .lpx-board .visual-only .rule {
+      display: none;
+    }
+
+    .apc-board {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 14px;
+      border: 3px solid #090a0b;
+      border-radius: 16px;
+      background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.1), transparent 32%),
+        #17191b;
+      color: #f4f4ee;
+      box-shadow:
+        inset 0 0 0 2px rgba(255, 255, 255, 0.06),
+        inset 0 0 42px rgba(0, 0, 0, 0.42),
+        0 18px 34px rgba(58, 29, 13, 0.28);
+      overflow-x: auto;
+    }
+
+    .apc-panel {
+      display: grid;
+      grid-template-columns: minmax(0, 2.45fr) minmax(268px, 1fr);
+      gap: 14px;
+      min-width: 890px;
+    }
+
+    .apc-left,
+    .apc-right {
+      display: grid;
+      align-content: start;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .apc-brand {
+      min-height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: #e8eceb;
+      font-weight: 850;
+      text-transform: uppercase;
+    }
+
+    .apc-brand .apc-logo {
+      font-size: 29px;
+      letter-spacing: 0;
+    }
+
+    .apc-brand .apc-mkii {
+      margin-left: 4px;
+      font-size: 12px;
+      writing-mode: vertical-rl;
+      vertical-align: middle;
+    }
+
+    .apc-row,
+    .apc-grid-row {
+      position: relative;
+      display: grid;
+      gap: 7px;
+      padding-top: 13px;
+    }
+
+    .apc-row::before,
+    .apc-grid-row::before,
+    .apc-module::before {
+      content: attr(data-label);
+      position: absolute;
+      left: 2px;
+      top: 0;
+      color: #a9b1af;
+      font-size: 10px;
+      line-height: 1;
+      font-weight: 760;
+      text-transform: uppercase;
+    }
+
+    .apc-eight {
+      grid-template-columns: repeat(8, minmax(0, 1fr));
+    }
+
+    .apc-nine {
+      grid-template-columns: repeat(9, minmax(0, 1fr));
+    }
+
+    .apc-clip-row {
+      grid-template-columns: repeat(8, minmax(0, 1fr)) 58px;
+      padding-top: 0;
+    }
+
+    .apc-mixer {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 58px;
+      gap: 7px;
+      align-items: start;
+    }
+
+    .apc-track-buttons {
+      display: grid;
+      gap: 5px;
+    }
+
+    .apc-right {
+      padding-left: 13px;
+      border-left: 1px solid rgba(244, 244, 238, 0.2);
+    }
+
+    .apc-module {
+      position: relative;
+      display: grid;
+      gap: 7px;
+      padding-top: 14px;
+    }
+
+    .apc-transport {
+      grid-template-columns: repeat(3, 1fr);
+    }
+
+    .apc-modes {
+      grid-template-columns: repeat(3, 1fr);
+    }
+
+    .apc-device-knobs {
+      grid-template-columns: repeat(4, 1fr);
+    }
+
+    .apc-device-buttons {
+      grid-template-columns: repeat(3, 1fr);
+    }
+
+    .apc-bank {
+      width: 150px;
+      grid-template-columns: repeat(3, 1fr);
+      justify-self: start;
+    }
+
+    .apc-bank .control-bank-up {
+      grid-column: 2;
+    }
+
+    .apc-bank .control-bank-left {
+      grid-column: 1;
+    }
+
+    .apc-bank .control-bank-right {
+      grid-column: 3;
+    }
+
+    .apc-bank .control-bank-down {
+      grid-column: 2;
+    }
+
+    .apc-bottom-right {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 9px;
+      align-items: start;
+    }
+
+    .apc-board .control {
+      min-width: 0;
+      min-height: 44px;
+      padding: 5px 4px;
+      gap: 3px;
+      border-color: #08090a;
+      border-radius: 4px;
+      background: #24282a;
+      color: #f2f3ee;
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.07),
+        0 1px 0 rgba(255, 255, 255, 0.06);
+    }
+
+    .apc-board .control.active:not(.visual-only) {
+      background: rgba(24, 169, 87, 0.18);
+      border-color: var(--passing);
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.07),
+        0 0 0 2px rgba(24, 169, 87, 0.5),
+        0 0 14px rgba(24, 169, 87, 0.3);
+    }
+
+    .apc-board .control.visual-only {
+      opacity: 0.76;
+    }
+
+    .apc-board .control.blocked {
+      background: #4b1e23;
+      border-color: #ef3340;
+      color: #fff0eb;
+    }
+
+    .apc-board .control.moving {
+      border-color: #f4f4ee;
+      box-shadow:
+        0 0 0 3px rgba(255, 255, 255, 0.82),
+        0 0 22px rgba(0, 190, 255, 0.72);
+    }
+
+    .apc-board .type-pad {
+      min-height: 58px;
+      aspect-ratio: 1.12;
+    }
+
+    .apc-board .pad-face {
+      width: 36px;
+      height: 23px;
+      border-color: #0e1011;
+      border-radius: 4px;
+      background: linear-gradient(#95f5d4, #35a88b);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28);
+    }
+
+    .apc-board .control[class*="clip-2"] .pad-face,
+    .apc-board .control[class*="clip-4"] .pad-face {
+      background: linear-gradient(#ffa9a2, #cf4146);
+    }
+
+    .apc-board .control[class*="clip-3"] .pad-face,
+    .apc-board .control[class*="clip-5"] .pad-face {
+      background: linear-gradient(#ffe491, #e0a52c);
+    }
+
+    .apc-board .button-face {
+      width: 35px;
+      height: 16px;
+      border-color: #0e1011;
+      border-radius: 3px;
+      background: linear-gradient(#e5e9e5, #929b9d);
+    }
+
+    .apc-board .control-scene-1 .button-face,
+    .apc-board .control-scene-2 .button-face,
+    .apc-board .control-scene-3 .button-face,
+    .apc-board .control-scene-4 .button-face,
+    .apc-board .control-scene-5 .button-face,
+    .apc-board .control-stop-all-clips .button-face,
+    .apc-board .control-record .button-face,
+    .apc-board .control-session .button-face,
+    .apc-board .control-record-arm-1 .button-face,
+    .apc-board .control-record-arm-2 .button-face,
+    .apc-board .control-record-arm-3 .button-face,
+    .apc-board .control-record-arm-4 .button-face,
+    .apc-board .control-record-arm-5 .button-face,
+    .apc-board .control-record-arm-6 .button-face,
+    .apc-board .control-record-arm-7 .button-face,
+    .apc-board .control-record-arm-8 .button-face {
+      background: linear-gradient(#ff7f6d, #cf333b);
+    }
+
+    .apc-board .knob-face {
+      width: 36px;
+      height: 36px;
+      border: 4px solid #070809;
+      background:
+        linear-gradient(#e9ece8, #e9ece8) 50% 6px/3px 11px no-repeat,
+        radial-gradient(circle at 50% 42%, #44494b 0 45%, #111315 46% 100%);
+      box-shadow:
+        0 0 0 2px #afb7b5,
+        0 4px 7px rgba(0, 0, 0, 0.42);
+    }
+
+    .apc-board .type-fader {
+      min-height: 148px;
+      background: transparent;
+      border-color: transparent;
+      box-shadow: none;
+    }
+
+    .apc-board .fader-face {
+      width: 30px;
+      height: 112px;
+      border: 0;
+      border-radius: 2px;
+      background:
+        linear-gradient(#08090a, #08090a) center/6px 100% no-repeat,
+        repeating-linear-gradient(to bottom, transparent 0 16px, rgba(244, 244, 238, 0.55) 16px 18px, transparent 18px 27px);
+    }
+
+    .apc-board .fader-face::after {
+      left: -5px;
+      right: -5px;
+      top: 44px;
+      height: 18px;
+      border-radius: 3px;
+      background: linear-gradient(#f0f1ec, #7f888a);
+      border: 1px solid #0b0d0e;
+    }
+
+    .apc-board .type-slider {
+      min-height: 70px;
+      background: transparent;
+      border-color: transparent;
+      box-shadow: none;
+    }
+
+    .apc-board .type-slider .fader-face {
+      width: 128px;
+      height: 34px;
+      background:
+        linear-gradient(#08090a, #08090a) center/100% 6px no-repeat,
+        repeating-linear-gradient(to right, transparent 0 17px, rgba(244, 244, 238, 0.55) 17px 19px, transparent 19px 28px);
+    }
+
+    .apc-board .type-slider .fader-face::after {
+      top: -5px;
+      bottom: -5px;
+      left: 54px;
+      right: auto;
+      width: 18px;
+      height: auto;
+    }
+
+    .apc-board .control.active:not(.visual-only) .knob-face {
+      box-shadow:
+        0 0 0 2px #afb7b5,
+        0 0 0 5px var(--passing),
+        0 0 15px rgba(24, 169, 87, 0.58);
+    }
+
+    .apc-board .control.active:not(.visual-only) .fader-face::after,
+    .apc-board .control.active:not(.visual-only) .button-face,
+    .apc-board .control.active:not(.visual-only) .pad-face {
+      border-color: #0f7d3d;
+      background: linear-gradient(#7df0a8, #18a957);
+    }
+
+    .apc-board .label {
+      max-width: 100%;
+      font-size: 10px;
+      line-height: 1.05;
+      overflow-wrap: anywhere;
+      text-align: center;
+    }
+
+    .apc-board .rule {
+      color: #b8c0be;
+      font-size: 8px;
+      line-height: 1;
+    }
+
+    .apc-board .visual-only .rule {
+      display: none;
+    }
+
+    .lcxl-board .control.active:not(.visual-only),
+    .lcxl-board .control.active:not(.visual-only).type-knob,
+    .lcxl-board .control.active:not(.visual-only).type-fader,
+    .lcxl-board .control.active:not(.visual-only).type-button,
+    .lpx-board .control.active:not(.visual-only),
+    .lpx-board .control.active:not(.visual-only).type-pad,
+    .lpx-board .control.active:not(.visual-only).type-button,
+    .apc-board .control.active:not(.visual-only),
+    .apc-board .control.active:not(.visual-only).type-knob,
+    .apc-board .control.active:not(.visual-only).type-fader,
+    .apc-board .control.active:not(.visual-only).type-slider,
+    .apc-board .control.active:not(.visual-only).type-pad,
+    .apc-board .control.active:not(.visual-only).type-button {
+      border-color: var(--passing);
+      background: rgba(217, 246, 194, 0.9);
+      color: var(--ink);
+    }
+
+    .lcxl-board .control.blocked,
+    .lcxl-board .control.blocked.type-knob,
+    .lcxl-board .control.blocked.type-fader,
+    .lcxl-board .control.blocked.type-button,
+    .lpx-board .control.blocked,
+    .lpx-board .control.blocked.type-pad,
+    .lpx-board .control.blocked.type-button,
+    .apc-board .control.blocked,
+    .apc-board .control.blocked.type-knob,
+    .apc-board .control.blocked.type-fader,
+    .apc-board .control.blocked.type-slider,
+    .apc-board .control.blocked.type-pad,
+    .apc-board .control.blocked.type-button {
+      border-color: var(--danger);
+      background: var(--danger-weak);
+      color: #5f1010;
+    }
+
+    .lcxl-board .control.moving,
+    .lcxl-board .control.moving.type-knob,
+    .lcxl-board .control.moving.type-fader,
+    .lcxl-board .control.moving.type-button,
+    .lpx-board .control.moving,
+    .lpx-board .control.moving.type-pad,
+    .lpx-board .control.moving.type-button,
+    .apc-board .control.moving,
+    .apc-board .control.moving.type-knob,
+    .apc-board .control.moving.type-fader,
+    .apc-board .control.moving.type-slider,
+    .apc-board .control.moving.type-pad,
+    .apc-board .control.moving.type-button {
+      border-color: var(--warning-strong);
+      background: var(--warning);
+      color: var(--ink);
+      box-shadow:
+        0 0 0 4px rgba(255, 255, 255, 0.92),
+        0 0 24px rgba(215, 154, 0, 0.8);
+    }
+
+    .lcxl-board .control.visual-only,
+    .lpx-board .control.visual-only,
+    .apc-board .control.visual-only {
+      background: #34383a;
+      color: #edf0ea;
     }
 
     .empty {
@@ -1375,6 +2143,7 @@ def build_app_html():
             <select id="templateSelect" aria-label="Controller template"></select>
             <select id="inputSelect" aria-label="MIDI input"></select>
             <button class="button primary" id="learnButton" type="button">Learn next control</button>
+            <button class="button apply" id="applyButton" type="button" disabled>Apply</button>
             <button class="button" id="refreshButton" type="button">Refresh</button>
           </div>
           <section class="controllers" id="controllers"></section>
@@ -1390,6 +2159,7 @@ def build_app_html():
       selectedTemplateId: null,
       selectedInput: null,
       rules: new Set(),
+      appliedRules: new Set(),
       inputs: [],
       controllers: [],
       activitySource: null,
@@ -1403,6 +2173,7 @@ def build_app_html():
     const board = document.querySelector("#board");
     const status = document.querySelector("#status");
     const learnButton = document.querySelector("#learnButton");
+    const applyButton = document.querySelector("#applyButton");
     const refreshButton = document.querySelector("#refreshButton");
 
     function setStatus(text) {
@@ -1526,6 +2297,23 @@ def build_app_html():
       return rulesForControl(control)[0] || "";
     }
 
+    function changedRules() {
+      const changed = new Set();
+      for (const rule of state.rules) {
+        if (!state.appliedRules.has(rule)) changed.add(rule);
+      }
+      for (const rule of state.appliedRules) {
+        if (!state.rules.has(rule)) changed.add(rule);
+      }
+      return changed;
+    }
+
+    function updateApplyState() {
+      const count = changedRules().size;
+      applyButton.disabled = count === 0;
+      applyButton.textContent = count ? `Apply (${count})` : "Apply";
+    }
+
     function controlFace(control) {
       const face = document.createElement("div");
       if (control.type === "fader" || control.type === "slider") {
@@ -1553,6 +2341,7 @@ def build_app_html():
       const ruleText = primaryRule(control);
       const hasRule = rules.length > 0;
       const isBlocked = rules.some((item) => state.rules.has(item));
+      const isPending = rules.some((item) => state.rules.has(item) !== state.appliedRules.has(item));
       const button = document.createElement("button");
       button.type = "button";
       button.className = [
@@ -1560,11 +2349,14 @@ def build_app_html():
         `type-${control.type || "knob"}`,
         `control-${control.id || "unknown"}`,
         isBlocked ? "blocked" : "active",
+        isPending ? "pending-change" : "",
         hasRule ? "" : "visual-only",
       ].filter(Boolean).join(" ");
       button.setAttribute("aria-pressed", String(isBlocked));
       button.disabled = !hasRule;
-      button.title = hasRule ? `${control.label} - ${isBlocked ? "Blocked" : "Passing"} - ${ruleText}` : `${control.label} - ${control.kind || "visual layout"}`;
+      const stateLabel = isBlocked ? "Bypassed" : "Passing";
+      const pendingLabel = isPending ? " - pending apply" : "";
+      button.title = hasRule ? `${control.label} - ${stateLabel}${pendingLabel} - ${ruleText}` : `${control.label} - ${control.kind || "visual layout"}`;
       button.dataset.rule = ruleText;
       button.dataset.rules = rules.join(" ");
       button.append(controlFace(control));
@@ -1580,7 +2372,7 @@ def build_app_html():
       button.append(ruleEl);
 
       if (hasRule) {
-        button.addEventListener("click", () => toggleRule(ruleText, !isBlocked));
+        button.addEventListener("click", () => toggleControlRules(rules, !isBlocked));
       }
       return button;
     }
@@ -1643,6 +2435,131 @@ def build_app_html():
       board.append(panel);
     }
 
+    function appendApcControls(parent, controls, label, className) {
+      if (!controls.length) return;
+      const element = document.createElement("div");
+      element.className = className;
+      element.dataset.label = label;
+      for (const control of controls) {
+        element.append(createControlButton(control));
+      }
+      parent.append(element);
+    }
+
+    function appendApcRow(parent, template, row, className) {
+      appendApcControls(parent, controlsForRow(template, row), row, className);
+    }
+
+    function controlsByIds(template, ids) {
+      const controlsById = new Map((template.controls || []).map((control) => [control.id, control]));
+      return ids.map((id) => controlsById.get(id)).filter(Boolean);
+    }
+
+    function appendLaunchpadControls(parent, controls, label, className) {
+      if (!controls.length) return;
+      const element = document.createElement("div");
+      element.className = className;
+      if (label) element.dataset.label = label;
+      for (const control of controls) {
+        element.append(createControlButton(control));
+      }
+      parent.append(element);
+    }
+
+    function renderLaunchpadXBoard(template) {
+      board.className = "board lpx-board";
+
+      const panel = document.createElement("div");
+      panel.className = "lpx-panel";
+
+      const brand = document.createElement("div");
+      brand.className = "lpx-brand";
+      brand.innerHTML = `<span><span class="novation">novation</span> Launchpad X</span><span class="model">64 RGB pads</span>`;
+
+      const topShell = document.createElement("div");
+      topShell.className = "lpx-top-shell";
+      appendLaunchpadControls(topShell, controlsByIds(template, [
+        "nav-up", "nav-down", "nav-left", "nav-right", "mode-session", "mode-note", "mode-custom", "capture-midi",
+      ]), "Top Controls", "lpx-top-row");
+
+      const logoTile = document.createElement("div");
+      logoTile.className = "lpx-logo-tile";
+      logoTile.innerHTML = `<span class="lpx-logo-mark" aria-hidden="true"></span>`;
+      topShell.append(logoTile);
+
+      const main = document.createElement("div");
+      main.className = "lpx-main";
+
+      const padGrid = document.createElement("div");
+      padGrid.className = "lpx-pad-grid";
+      for (const row of ["Grid 8", "Grid 7", "Grid 6", "Grid 5", "Grid 4", "Grid 3", "Grid 2", "Grid 1"]) {
+        appendLaunchpadControls(padGrid, controlsForRow(template, row), row, "lpx-grid-row");
+      }
+
+      appendLaunchpadControls(main, controlsByIds(template, [
+        "scene-volume", "scene-pan", "scene-send-a", "scene-send-b", "scene-stop-clip", "scene-mute", "scene-solo", "scene-record-arm",
+      ]), "Scene Launch", "lpx-side");
+
+      main.prepend(padGrid);
+      panel.append(brand, topShell, main);
+      board.append(panel);
+    }
+
+    function renderApc40Board(template) {
+      board.className = "board apc-board";
+
+      const panel = document.createElement("div");
+      panel.className = "apc-panel";
+
+      const left = document.createElement("div");
+      left.className = "apc-left";
+      appendApcRow(left, template, "Channel Controls", "apc-row apc-eight");
+
+      for (const row of ["Clip Grid 5", "Clip Grid 4", "Clip Grid 3", "Clip Grid 2", "Clip Grid 1"]) {
+        appendApcRow(left, template, row, "apc-grid-row apc-clip-row");
+      }
+
+      appendApcRow(left, template, "Clip Stop", "apc-row apc-nine");
+      appendApcRow(left, template, "Track Select", "apc-row apc-nine");
+
+      const trackButtons = document.createElement("div");
+      trackButtons.className = "apc-track-buttons";
+      appendApcRow(trackButtons, template, "Track Activator", "apc-row apc-eight");
+      appendApcRow(trackButtons, template, "Crossfade Assign", "apc-row apc-eight");
+      appendApcRow(trackButtons, template, "Solo", "apc-row apc-eight");
+      appendApcRow(trackButtons, template, "Record Arm", "apc-row apc-eight");
+      left.append(trackButtons);
+
+      const channelFaders = controlsByIds(template, [
+        "fader-1", "fader-2", "fader-3", "fader-4", "fader-5", "fader-6", "fader-7", "fader-8", "master-fader",
+      ]);
+      appendApcControls(left, channelFaders, "Track Volume", "apc-row apc-nine");
+
+      const right = document.createElement("div");
+      right.className = "apc-right";
+      const brand = document.createElement("div");
+      brand.className = "apc-brand";
+      brand.innerHTML = `<span class="apc-logo">APC40<span class="apc-mkii">mkII</span></span><span>AKAI</span>`;
+      right.append(brand);
+      appendApcRow(right, template, "Transport", "apc-module apc-transport");
+      appendApcRow(right, template, "Assignable Modes", "apc-module apc-modes");
+      appendApcRow(right, template, "Device Controls", "apc-module apc-device-knobs");
+      appendApcRow(right, template, "Device Buttons", "apc-module apc-device-buttons");
+
+      const bottom = document.createElement("div");
+      bottom.className = "apc-bottom-right";
+      appendApcRow(bottom, template, "Bank Select", "apc-module apc-bank");
+      const utility = document.createElement("div");
+      utility.className = "apc-left";
+      appendApcRow(utility, template, "Cue", "apc-module");
+      appendApcControls(utility, controlsByIds(template, ["crossfader"]), "Crossfader", "apc-module");
+      bottom.append(utility);
+      right.append(bottom);
+
+      panel.append(left, right);
+      board.append(panel);
+    }
+
     function renderBoard() {
       const template = selectedTemplate();
       board.className = "board";
@@ -1657,6 +2574,16 @@ def build_app_html():
 
       if (template.layout === "novation_launch_control_xl") {
         renderLaunchControlXLBoard(template);
+        return;
+      }
+
+      if (template.layout === "akai_apc40_mkii") {
+        renderApc40Board(template);
+        return;
+      }
+
+      if (template.layout === "novation_launchpad_x") {
+        renderLaunchpadXBoard(template);
         return;
       }
 
@@ -1803,24 +2730,43 @@ def build_app_html():
       state.selectedTemplateId = state.selectedTemplateId || detected?.template_id || data.templates[0]?.id || null;
       state.selectedInput = state.selectedInput || detected?.input || null;
       state.rules = new Set(data.blocked_rules);
+      state.appliedRules = new Set(data.blocked_rules);
       state.inputs = Array.isArray(data.inputs) ? data.inputs : [];
       renderSelects();
       renderControllers();
       renderBoard();
       startActivityStream();
+      updateApplyState();
       setStatus(`${state.rules.size} blocked controls`);
     }
 
-    async function toggleRule(rule, blocked) {
-      setStatus(blocked ? `Blocking ${rule}` : `Passing ${rule}`);
-      const data = await fetchJson("/api/blocks", {
+    function toggleControlRules(rules, blocked) {
+      for (const rule of rules) {
+        if (blocked) {
+          state.rules.add(rule);
+        } else {
+          state.rules.delete(rule);
+        }
+      }
+      renderBoard();
+      updateApplyState();
+      const label = rules.length === 1 ? rules[0] : `${rules.length} rules`;
+      setStatus(`${label} ${blocked ? "marked for bypass" : "marked passing"}`);
+    }
+
+    async function applyRules() {
+      applyButton.disabled = true;
+      setStatus("Applying bypasses");
+      const data = await fetchJson("/api/blocks/apply", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rule, blocked }),
+        body: JSON.stringify({ blocked_rules: [...state.rules] }),
       });
       state.rules = new Set(data.blocked_rules);
+      state.appliedRules = new Set(data.blocked_rules);
       renderBoard();
-      setStatus(`${rule} ${blocked ? "blocked" : "passing"}`);
+      updateApplyState();
+      setStatus(`${state.rules.size} bypassed controls applied`);
     }
 
     async function learnNextControl() {
@@ -1830,12 +2776,13 @@ def build_app_html():
         const data = await fetchJson("/api/learn", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ input: inputSelect.value, block: true, timeout: 10 }),
+          body: JSON.stringify({ input: inputSelect.value, block: false, timeout: 10 }),
         });
-        state.rules = new Set(data.blocked_rules);
+        state.rules.add(data.rule);
         renderBoard();
+        updateApplyState();
         const label = data.match?.control?.label || data.rule;
-        setStatus(`${label} blocked`);
+        setStatus(`${label} marked for bypass`);
       } finally {
         learnButton.disabled = false;
       }
@@ -1856,6 +2803,10 @@ def build_app_html():
     });
     refreshButton.addEventListener("click", () => loadState().catch((error) => setStatus(error.message)));
     learnButton.addEventListener("click", () => learnNextControl().catch((error) => setStatus(error.message)));
+    applyButton.addEventListener("click", () => applyRules().catch((error) => {
+      setStatus(error.message);
+      updateApplyState();
+    }));
 
     loadState().catch((error) => setStatus(error.message));
   </script>
@@ -1922,6 +2873,8 @@ class MidiFixHandler(BaseHTTPRequestHandler):
         try:
             if route == "/api/blocks":
                 self.send_json(self.api_blocks(read_json(self)))
+            elif route == "/api/blocks/apply":
+                self.send_json(self.api_blocks_apply(read_json(self)))
             elif route == "/api/learn":
                 self.send_json(self.api_learn(read_json(self)))
             else:
@@ -1957,6 +2910,15 @@ class MidiFixHandler(BaseHTTPRequestHandler):
             "blocked_rules": [tuple_to_rule_text(item) for item in sorted(rules)],
         }
 
+    def api_blocks_apply(self, payload):
+        rule_texts = payload.get("blocked_rules", [])
+        if not isinstance(rule_texts, list):
+            raise ValueError("blocked_rules must be a list")
+        rules = self.state.set_rules(rule_texts)
+        return {
+            "blocked_rules": [tuple_to_rule_text(item) for item in sorted(rules)],
+        }
+
     def api_learn(self, payload):
         input_name = payload.get("input") or "Launch Control XL"
         timeout = float(payload.get("timeout", 10))
@@ -1974,7 +2936,11 @@ class MidiFixHandler(BaseHTTPRequestHandler):
                         continue
                     if rule_text_to_tuple(rule) in ignored_rules:
                         continue
-                    _rule, rules = self.state.set_blocked(rule, should_block)
+                    if should_block:
+                        _rule, rules = self.state.set_blocked(rule, True)
+                    else:
+                        _rule = rule
+                        rules = ignored_rules
                     return {
                         "rule": rule,
                         "blocked": should_block,

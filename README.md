@@ -62,14 +62,15 @@ the built app directly:
 ditto build/dmg/midifix.app /Applications/midifix.app
 ```
 
-Click a fader or knob to block it. Click it again to let it pass. The running
-filter reloads `blocked_controls.txt` every second, so UI changes take effect
-without restarting the MIDI filter.
+Controls that are passing are green. Move a fader or knob and its tile flashes
+yellow while it is sending MIDI, which makes a stuck control easy to spot.
+Click a control to mark it red for bypass, then click **Apply** to update the
+running filter. Click a red control again before applying to leave it passing.
 
-Move a fader or knob and its tile lights up briefly. If a control is stuck and
-keeps sending MIDI, that tile will keep pulsing so you can spot it quickly.
-Once you block that control, midifix ignores it in the activity monitor and in
-learn mode, so another bad control can be detected next.
+The running filter reloads `blocked_controls.txt` every second, so applied UI
+changes take effect without restarting the MIDI filter. Once you apply a bypass,
+midifix ignores that control in the activity monitor and in learn mode, so
+another bad control can be detected next.
 
 The connected MIDI area shows ports detected on the system. Known controllers
 are matched to templates automatically, while unknown or virtual ports are still

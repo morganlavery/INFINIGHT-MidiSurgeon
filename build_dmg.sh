@@ -17,6 +17,8 @@ cp "$ROOT_DIR/midifix.app/Contents/Info.plist" "$APP_OUT/Contents/Info.plist"
 cp "$ROOT_DIR/midifix.app/Contents/MacOS/midifix" "$APP_OUT/Contents/MacOS/midifix"
 chmod +x "$APP_OUT/Contents/MacOS/midifix"
 
+rsync -a "$ROOT_DIR/midifix.app/Contents/Resources/" "$APP_RESOURCES/"
+
 rsync -a \
   "$ROOT_DIR/midifix.py" \
   "$ROOT_DIR/midifix_desktop.py" \
